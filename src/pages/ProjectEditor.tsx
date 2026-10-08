@@ -3,12 +3,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Project, Page, Menu, Theme, ThemeVariant } from '../types';
 import { getProject, saveProject } from '../storage/BrowserStorage';
-import { getActiveTheme } from '../data/themes';
+import { themes } from '../data/themes';
+import { themeVariants, getThemeVariant, getThemeVariants } from '../data/themeVariants';
 import { PageCanvas } from '../components/PageCanvas';
 import { MenuEditor } from '../components/MenuEditor';
-import { ThemePicker } from '../components/ThemePicker';
-import { PreviewModal } from '../components/PreviewModal';
-import { ExportModal } from '../components/ExportModal';
+import { ThemeSelector } from '../components/ThemeSelector';
 
 export function ProjectEditor() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -16,8 +15,6 @@ export function ProjectEditor() {
   const [project, setProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<'pages' | 'menus' | 'theme' | 'settings'>('pages');
   const [selectedPageId, setSelectedPageId] = useState<string>('');
-  const [showPreview, setShowPreview] = useState(false);
-  const [showExport, setShowExport] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -51,17 +48,13 @@ export function ProjectEditor() {
       title: 'New Page',
       slug: `page-${Date.now()}`,
       sections: [],
-      layout: {
-        type: 'full-width',
-        maxWidth: '1200px',
-        padding: '0',
-      },
       seo: {
         title: '',
         description: '',
         keywords: [],
       },
       status: 'draft',
+      order: project.pages.length,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -102,6 +95,8 @@ export function ProjectEditor() {
         id: Date.now().toString(),
         name: `${menu.name} (Copy)`,
         items: menu.items.map(item => ({ ...item, id: Date.now().toString() + Math.random() })),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
       updateProject({ menus: [...project.menus, cloned] });
     }
@@ -133,7 +128,10 @@ export function ProjectEditor() {
     );
   }
 
-  const theme = getActiveTheme(project.themeId, project.themeVariantId);
+  const theme = themes.find(t => t.id === project.themeId);
+  const themeVariant = project.themeVariantId ? getThemeVariant(project.themeVariantId) : null;
+  const activeTheme = themeVariant || theme;
+
   const selectedPage = project.pages.find(p => p.id === selectedPageId);
 
   return (
@@ -238,14 +236,62 @@ export function ProjectEditor() {
             )}
 
             {activeTab === 'menus' && (
-              <div className="text-sm text-gray-600">
-                <p>Manage menus in the main area →</p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    const newMenu: Menu = {
+                      id: Date.now().toString(),
+                      name: 'New Menu',
+                      location: 'primary',
+                      items: [],
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    };
+                    updateMenu(newMenu);
+                  }}
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                >
+                  + Add Menu
+                </button>
+                {project.menus.map(menu => (
+                  <div
+                    key={menu.id}
+                    className="p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="font-medium text-sm text-gray-900">{menu.name}</div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => cloneMenu(menu.id)}
+                          className="text-xs text-indigo-600 hover:text-indigo-800"
+                          title="Clone menu"
+                        >
+                          📋
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm('Delete this menu?')) {
+                              deleteMenu(menu.id);
+                            }
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800"
+                          title="Delete menu"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {menu.items.length} items • {menu.location}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
             {activeTab === 'theme' && (
               <div className="text-sm text-gray-600">
-                <p>Select theme in the main area →</p>
+                Select theme in the main area
               </div>
             )}
 
@@ -303,47 +349,28 @@ export function ProjectEditor() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Address
-                  </label>
-                  <textarea
-                    value={project.settings.address}
-                    onChange={(e) => updateProject({
-                      settings: { ...project.settings, address: e.target.value }
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    rows={2}
-                  />
-                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="p-4 border-t border-gray-200 space-y-2">
+        {/* Preview button */}
+        <div className="p-4 border-t border-gray-200">
           <button
-            onClick={() => setShowPreview(true)}
+            onClick={() => navigate(`/preview/${project.id}`)}
             className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
           >
             👁️ Preview Website
-          </button>
-          <button
-            onClick={() => setShowExport(true)}
-            className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-          >
-            📦 Export Website
           </button>
         </div>
       </div>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {activeTab === 'pages' && selectedPage && theme && (
+        {activeTab === 'pages' && selectedPage && activeTheme && (
           <PageCanvas
             page={selectedPage}
-            theme={theme}
+            theme={activeTheme}
             onUpdate={updatePage}
           />
         )}
@@ -353,16 +380,14 @@ export function ProjectEditor() {
             menus={project.menus}
             pages={project.pages}
             onUpdateMenu={updateMenu}
-            onCloneMenu={cloneMenu}
-            onDeleteMenu={deleteMenu}
           />
         )}
 
         {activeTab === 'theme' && (
-          <ThemePicker
+          <ThemeSelector
             currentThemeId={project.themeId}
             currentVariantId={project.themeVariantId}
-            onSelect={updateTheme}
+            onSelectTheme={updateTheme}
           />
         )}
 
@@ -375,24 +400,6 @@ export function ProjectEditor() {
           </div>
         )}
       </div>
-
-      {/* Preview modal */}
-      {showPreview && theme && (
-        <PreviewModal
-          project={project}
-          theme={theme}
-          onClose={() => setShowPreview(false)}
-        />
-      )}
-
-      {/* Export modal */}
-      {showExport && theme && (
-        <ExportModal
-          project={project}
-          theme={theme}
-          onClose={() => setShowExport(false)}
-        />
-      )}
     </div>
   );
 }

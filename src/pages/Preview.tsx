@@ -1,9 +1,9 @@
-// Full website preview page
+// Full website preview with edit mode
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Project, Theme, ThemeVariant } from '../types';
-import { getProject } from '../storage/BrowserStorage';
-import { getActiveTheme } from '../data/themes';
+import { getProject, saveProject } from '../storage/BrowserStorage';
+import { getActiveTheme } from '../data/themeVariants';
 import { SectionRenderer } from '../components/SectionRenderer';
 
 export function Preview() {
@@ -11,15 +11,21 @@ export function Preview() {
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     if (projectId) {
       const p = getProject(projectId);
-      if (p) {
-        setProject(p);
-      }
+      if (p) setProject(p);
     }
   }, [projectId]);
+
+  const updateProject = (updates: Partial<Project>) => {
+    if (!project) return;
+    const updated = { ...project, ...updates, updatedAt: new Date().toISOString() };
+    setProject(updated);
+    saveProject(updated);
+  };
 
   if (!project) {
     return (
@@ -39,15 +45,29 @@ export function Preview() {
 
   const theme = getActiveTheme(project.themeId, project.themeVariantId);
   if (!theme) {
-    return <div>Theme not found</div>;
+    return <div className="p-8">Theme not found</div>;
   }
 
   const currentPage = project.pages[currentPageIndex];
-  const headerMenu = project.menus.find(m => m.location === 'header');
-  const footerMenu = project.menus.find(m => m.location === 'footer');
+  const primaryMenu = project.menus.find(m => m.location === 'primary');
+
+  const updateSection = (sectionId: string, updates: any) => {
+    const updatedPages = project.pages.map((page, idx) => {
+      if (idx === currentPageIndex) {
+        return {
+          ...page,
+          sections: page.sections.map(s => 
+            s.id === sectionId ? { ...s, ...updates } : s
+          ),
+        };
+      }
+      return page;
+    });
+    updateProject({ pages: updatedPages });
+  };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={{ backgroundColor: theme.tokens.colors.background }}>
       {/* Preview toolbar */}
       <div className="fixed top-0 left-0 right-0 bg-gray-900 text-white z-50 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -58,6 +78,14 @@ export function Preview() {
             ← Back to Editor
           </button>
           <span className="font-medium">{project.name} - Preview Mode</span>
+          <button
+            onClick={() => setEditMode(!editMode)}
+            className={`px-3 py-1 rounded text-sm ${
+              editMode ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+          >
+            {editMode ? '✓ Edit Mode' : 'Edit Mode'}
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -66,7 +94,9 @@ export function Preview() {
             className="px-3 py-1 bg-gray-700 rounded text-sm"
           >
             {project.pages.map((page, idx) => (
-              <option key={page.id} value={idx}>{page.title}</option>
+              <option key={page.id} value={idx}>
+                {page.title}
+              </option>
             ))}
           </select>
         </div>
@@ -74,36 +104,36 @@ export function Preview() {
 
       <div className="pt-12">
         <div style={{ 
-          fontFamily: theme.typography.body,
-          backgroundColor: theme.colors.background,
-          color: theme.colors.text,
+          fontFamily: theme.tokens.typography.body,
+          backgroundColor: theme.tokens.colors.background,
+          color: theme.tokens.colors.text,
         }}>
           {/* Header */}
           <header style={{ 
-            backgroundColor: theme.colors.surface,
-            borderBottom: `1px solid ${theme.colors.border}`,
+            backgroundColor: theme.tokens.colors.surface,
+            borderBottom: `1px solid ${theme.tokens.colors.border}`,
             padding: '1rem 2rem',
             position: 'sticky',
             top: '48px',
             zIndex: 10,
           }}>
             <div style={{ 
-              maxWidth: theme.containerWidth,
+              maxWidth: theme.tokens.containerWidth,
               margin: '0 auto',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
             }}>
               <div style={{ 
-                fontFamily: theme.typography.heading,
+                fontFamily: theme.tokens.typography.heading,
                 fontSize: '1.5rem',
                 fontWeight: 'bold',
-                color: theme.colors.primary,
+                color: theme.tokens.colors.primary,
               }}>
                 {project.settings.siteTitle || project.name}
               </div>
               <nav style={{ display: 'flex', gap: '2rem' }}>
-                {headerMenu?.items.map(item => (
+                {primaryMenu?.items.map(item => (
                   <button
                     key={item.id}
                     onClick={() => {
@@ -111,8 +141,8 @@ export function Preview() {
                       if (pageIndex !== -1) setCurrentPageIndex(pageIndex);
                     }}
                     style={{
-                      color: theme.colors.text,
-                      fontFamily: theme.typography.body,
+                      color: theme.tokens.colors.text,
+                      fontFamily: theme.tokens.typography.body,
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
@@ -126,8 +156,8 @@ export function Preview() {
                     key={page.id}
                     onClick={() => setCurrentPageIndex(idx)}
                     style={{
-                      color: currentPageIndex === idx ? theme.colors.primary : theme.colors.text,
-                      fontFamily: theme.typography.body,
+                      color: currentPageIndex === idx ? theme.tokens.colors.primary : theme.tokens.colors.text,
+                      fontFamily: theme.tokens.typography.body,
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
@@ -148,19 +178,21 @@ export function Preview() {
                 key={section.id}
                 section={section}
                 theme={theme}
+                editMode={editMode}
+                onUpdate={(updates) => updateSection(section.id, updates)}
               />
             ))}
           </main>
 
           {/* Footer */}
           <footer style={{
-            backgroundColor: theme.colors.text,
-            color: theme.colors.background,
+            backgroundColor: theme.tokens.colors.text,
+            color: theme.tokens.colors.background,
             padding: '3rem 2rem',
             marginTop: '4rem',
           }}>
             <div style={{ 
-              maxWidth: theme.containerWidth,
+              maxWidth: theme.tokens.containerWidth,
               margin: '0 auto',
             }}>
               <div style={{ 
@@ -171,63 +203,28 @@ export function Preview() {
               }}>
                 <div>
                   <h3 style={{ 
-                    fontFamily: theme.typography.heading,
+                    fontFamily: theme.tokens.typography.heading,
                     fontSize: '1.25rem',
                     fontWeight: 'bold',
                     marginBottom: '1rem',
-                    color: theme.colors.background,
+                    color: theme.tokens.colors.background,
                   }}>
                     {project.settings.siteTitle || project.name}
                   </h3>
                   <p style={{ 
-                    fontFamily: theme.typography.body,
-                    color: theme.colors.background,
+                    fontFamily: theme.tokens.typography.body,
+                    color: theme.tokens.colors.background,
                     opacity: 0.8,
                   }}>
                     {project.settings.siteDescription || 'Professional website'}
                   </p>
                 </div>
-                {footerMenu && (
-                  <div>
-                    <h4 style={{ 
-                      fontFamily: theme.typography.heading,
-                      fontWeight: 'bold',
-                      marginBottom: '1rem',
-                      color: theme.colors.background,
-                    }}>
-                      Quick Links
-                    </h4>
-                    <ul style={{ listStyle: 'none', padding: 0 }}>
-                      {footerMenu.items.map(item => (
-                        <li key={item.id} style={{ marginBottom: '0.5rem' }}>
-                          <button
-                            onClick={() => {
-                              const pageIndex = project.pages.findIndex(p => p.slug === item.target);
-                              if (pageIndex !== -1) setCurrentPageIndex(pageIndex);
-                            }}
-                            style={{
-                              color: theme.colors.background,
-                              opacity: 0.8,
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              fontFamily: theme.typography.body,
-                            }}
-                          >
-                            {item.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
                 <div>
                   <h4 style={{ 
-                    fontFamily: theme.typography.heading,
+                    fontFamily: theme.tokens.typography.heading,
                     fontWeight: 'bold',
                     marginBottom: '1rem',
-                    color: theme.colors.background,
+                    color: theme.tokens.colors.background,
                   }}>
                     Contact
                   </h4>
@@ -255,7 +252,7 @@ export function Preview() {
                 paddingTop: '2rem',
                 borderTop: `1px solid rgba(255, 255, 255, 0.1)`,
                 opacity: 0.6,
-                fontFamily: theme.typography.body,
+                fontFamily: theme.tokens.typography.body,
               }}>
                 © {new Date().getFullYear()} {project.settings.siteTitle || project.name}. All rights reserved.
               </div>

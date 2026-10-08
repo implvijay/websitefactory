@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../types';
 import { getProjects, deleteProject, getCurrentUser, logout } from '../storage/BrowserStorage';
-import { themes } from '../data/themes';
 import { industries } from '../data/industries';
+import { themes } from '../data/themes';
+import { generateDefaultSections } from '../data/content';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ export function Dashboard() {
                   <div
                     className="h-32 flex items-center justify-center"
                     style={{
-                      background: `linear-gradient(135deg, ${theme?.colors.primary} 0%, ${theme?.colors.secondary} 100%)`,
+                      background: `linear-gradient(135deg, ${theme?.tokens.colors.primary} 0%, ${theme?.tokens.colors.secondary} 100%)`,
                     }}
                   >
                     <span className="text-white text-4xl font-bold">
@@ -147,6 +148,9 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
+      // Generate rich content based on selected theme
+      const defaultSections = generateDefaultSections(themeId);
+      
       const newProject: Project = {
         id: Date.now().toString(),
         name: name.trim(),
@@ -158,18 +162,102 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
             id: 'home',
             title: 'Home',
             slug: 'home',
-            sections: [],
-            layout: {
-              type: 'full-width',
-              maxWidth: '1200px',
-              padding: '0',
-            },
+            sections: defaultSections,
             seo: {
-              title: '',
-              description: '',
+              title: name,
+              description: `Welcome to ${name} - Professional website`,
               keywords: [],
             },
-            status: 'draft',
+            status: 'published',
+            order: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: 'about',
+            title: 'About',
+            slug: 'about',
+            sections: [
+              {
+                id: 'about-hero',
+                type: 'hero',
+                variant: 'centered',
+                content: {
+                  heading: 'About Us',
+                  description: 'Learn more about our company and mission.',
+                  buttonText: '',
+                },
+                settings: {},
+                animation: { type: 'fade', duration: 600, delay: 0 },
+                order: 0,
+                visible: true,
+              },
+              {
+                id: 'about-text',
+                type: 'text',
+                variant: 'center',
+                content: {
+                  content: '<p>We are a leading company dedicated to providing exceptional services to our clients. With years of experience and a passion for excellence, we strive to exceed expectations in everything we do.</p>',
+                },
+                settings: {},
+                animation: { type: 'slide', duration: 600, delay: 100 },
+                order: 1,
+                visible: true,
+              },
+            ],
+            seo: {
+              title: 'About Us',
+              description: 'Learn more about our company',
+              keywords: [],
+            },
+            status: 'published',
+            order: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: 'contact',
+            title: 'Contact',
+            slug: 'contact',
+            sections: [
+              {
+                id: 'contact-hero',
+                type: 'hero',
+                variant: 'centered',
+                content: {
+                  heading: 'Contact Us',
+                  description: 'Get in touch with our team.',
+                  buttonText: '',
+                },
+                settings: {},
+                animation: { type: 'fade', duration: 600, delay: 0 },
+                order: 0,
+                visible: true,
+              },
+              {
+                id: 'contact-info',
+                type: 'contact',
+                variant: 'simple',
+                content: {
+                  title: 'Get in Touch',
+                  description: 'We\'d love to hear from you. Reach out to us using the information below.',
+                  email: 'info@example.com',
+                  phone: '+1 (555) 000-0000',
+                  address: '123 Main Street, City, State 12345',
+                },
+                settings: {},
+                animation: { type: 'slide', duration: 600, delay: 100 },
+                order: 1,
+                visible: true,
+              },
+            ],
+            seo: {
+              title: 'Contact Us',
+              description: 'Get in touch with us',
+              keywords: [],
+            },
+            status: 'published',
+            order: 2,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
@@ -178,21 +266,84 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
           {
             id: 'main-menu',
             name: 'Main Menu',
-            location: 'header',
-            items: [],
+            location: 'primary',
+            items: [
+              {
+                id: 'menu-home',
+                label: 'Home',
+                type: 'page',
+                target: 'home',
+                children: [],
+                enabled: true,
+                openInNewTab: false,
+                order: 0,
+              },
+              {
+                id: 'menu-about',
+                label: 'About',
+                type: 'page',
+                target: 'about',
+                children: [],
+                enabled: true,
+                openInNewTab: false,
+                order: 1,
+              },
+              {
+                id: 'menu-contact',
+                label: 'Contact',
+                type: 'page',
+                target: 'contact',
+                children: [],
+                enabled: true,
+                openInNewTab: false,
+                order: 2,
+              },
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: 'footer-menu',
+            name: 'Footer Menu',
+            location: 'footer',
+            items: [
+              {
+                id: 'footer-privacy',
+                label: 'Privacy Policy',
+                type: 'page',
+                target: 'home',
+                children: [],
+                enabled: true,
+                openInNewTab: false,
+                order: 0,
+              },
+              {
+                id: 'footer-terms',
+                label: 'Terms of Service',
+                type: 'page',
+                target: 'home',
+                children: [],
+                enabled: true,
+                openInNewTab: false,
+                order: 1,
+              },
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           },
         ],
         forms: [],
+        media: [],
+        versions: [],
         settings: {
           siteTitle: name,
-          siteDescription: '',
-          contactEmail: '',
-          contactPhone: '',
-          address: '',
+          siteDescription: `Welcome to ${name} - Professional website built with Website Factory`,
+          contactEmail: 'info@example.com',
+          contactPhone: '+1 (555) 000-0000',
+          address: '123 Main Street, City, State 12345',
           socialLinks: {},
           analytics: {},
         },
-        versions: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -257,7 +408,7 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
                   <div
                     className="h-16 rounded mb-2"
                     style={{
-                      background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.secondary} 100%)`,
+                      background: `linear-gradient(135deg, ${theme.tokens.colors.primary} 0%, ${theme.tokens.colors.secondary} 100%)`,
                     }}
                   />
                   <div className="text-sm font-medium text-gray-900">{theme.name}</div>

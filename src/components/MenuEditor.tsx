@@ -8,8 +8,6 @@ interface MenuEditorProps {
   menus: Menu[];
   pages: Page[];
   onUpdateMenu: (menu: Menu) => void;
-  onCloneMenu: (menuId: string) => void;
-  onDeleteMenu: (menuId: string) => void;
 }
 
 function DraggableMenuItem({ item, onEdit, onDelete }: { item: MenuItem; onEdit: () => void; onDelete: () => void }) {
@@ -55,7 +53,7 @@ function DraggableMenuItem({ item, onEdit, onDelete }: { item: MenuItem; onEdit:
   );
 }
 
-export function MenuEditor({ menus, pages, onUpdateMenu, onCloneMenu, onDeleteMenu }: MenuEditorProps) {
+export function MenuEditor({ menus, pages, onUpdateMenu }: MenuEditorProps) {
   const [selectedMenuId, setSelectedMenuId] = useState<string>(menus[0]?.id || '');
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
@@ -73,6 +71,8 @@ export function MenuEditor({ menus, pages, onUpdateMenu, onCloneMenu, onDeleteMe
       const newItems = [...selectedMenu.items];
       const [moved] = newItems.splice(oldIndex, 1);
       newItems.splice(newIndex, 0, moved);
+      // Update order
+      newItems.forEach((item, i) => item.order = i);
       onUpdateMenu({ ...selectedMenu, items: newItems });
     }
   };
@@ -133,8 +133,10 @@ export function MenuEditor({ menus, pages, onUpdateMenu, onCloneMenu, onDeleteMe
               const newMenu: Menu = {
                 id: Date.now().toString(),
                 name: 'New Menu',
-                location: 'header',
+                location: 'primary',
                 items: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
               };
               onUpdateMenu(newMenu);
               setSelectedMenuId(newMenu.id);
@@ -158,30 +160,6 @@ export function MenuEditor({ menus, pages, onUpdateMenu, onCloneMenu, onDeleteMe
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="font-medium text-sm text-gray-900">{menu.name}</div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCloneMenu(menu.id);
-                    }}
-                    className="text-xs text-indigo-600 hover:text-indigo-800"
-                    title="Clone menu"
-                  >
-                    📋
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm('Delete this menu?')) {
-                        onDeleteMenu(menu.id);
-                      }
-                    }}
-                    className="text-xs text-red-600 hover:text-red-800"
-                    title="Delete menu"
-                  >
-                    🗑️
-                  </button>
-                </div>
               </div>
               <div className="text-xs text-gray-500">
                 {menu.items.length} items • {menu.location}
@@ -217,8 +195,10 @@ export function MenuEditor({ menus, pages, onUpdateMenu, onCloneMenu, onDeleteMe
                     onChange={(e) => updateMenuLocation(e.target.value as Menu['location'])}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
-                    <option value="header">Header</option>
+                    <option value="primary">Primary</option>
+                    <option value="utility">Utility</option>
                     <option value="footer">Footer</option>
+                    <option value="mobile">Mobile</option>
                     <option value="sidebar">Sidebar</option>
                   </select>
                 </div>
@@ -298,11 +278,13 @@ function MenuItemModal({ pages, item, onSave, onClose }: {
   const [label, setLabel] = useState(item?.label || '');
   const [type, setType] = useState<MenuItem['type']>(item?.type || 'page');
   const [target, setTarget] = useState(item?.target || '');
+  const [enabled, setEnabled] = useState(item?.enabled !== false);
+  const [openInNewTab, setOpenInNewTab] = useState(item?.openInNewTab || false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (label.trim() && target.trim()) {
-      onSave({ label: label.trim(), type, target: target.trim() });
+      onSave({ label: label.trim(), type, target: target.trim(), children: [], enabled, openInNewTab });
     }
   };
 
@@ -344,12 +326,15 @@ function MenuItemModal({ pages, item, onSave, onClose }: {
               <option value="page">Page</option>
               <option value="url">External URL</option>
               <option value="anchor">Anchor Link</option>
+              <option value="email">Email</option>
+              <option value="phone">Phone</option>
+              <option value="file">File/Download</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {type === 'page' ? 'Select Page' : type === 'url' ? 'URL' : 'Anchor'}
+              {type === 'page' ? 'Select Page' : type === 'url' ? 'URL' : type === 'email' ? 'Email' : type === 'phone' ? 'Phone' : type === 'file' ? 'File Path' : 'Anchor'}
             </label>
             {type === 'page' ? (
               <select
@@ -367,14 +352,41 @@ function MenuItemModal({ pages, item, onSave, onClose }: {
               </select>
             ) : (
               <input
-                type={type === 'url' ? 'url' : 'text'}
+                type={type === 'url' ? 'url' : type === 'email' ? 'email' : type === 'phone' ? 'tel' : 'text'}
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                placeholder={type === 'url' ? 'https://example.com' : '#section-id'}
+                placeholder={
+                  type === 'url' ? 'https://example.com' :
+                  type === 'email' ? 'email@example.com' :
+                  type === 'phone' ? '+1 (555) 000-0000' :
+                  type === 'file' ? '/downloads/file.pdf' :
+                  type === 'anchor' ? '#section-id' : ''
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
               />
             )}
+          </div>
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => setEnabled(e.target.checked)}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <span className="text-sm text-gray-700">Enabled</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={openInNewTab}
+                onChange={(e) => setOpenInNewTab(e.target.checked)}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <span className="text-sm text-gray-700">Open in new tab</span>
+            </label>
           </div>
 
           <div className="flex gap-3 pt-4">

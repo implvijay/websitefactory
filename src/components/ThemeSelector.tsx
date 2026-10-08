@@ -1,15 +1,16 @@
-// Theme picker with variants
+// Theme selector with variants
 import { useState } from 'react';
 import type { Theme, ThemeVariant } from '../types';
-import { themes, themeVariants, getThemeVariants } from '../data/themes';
+import { themes } from '../data/themes';
+import { themeVariants, getThemeVariants } from '../data/themeVariants';
 
-interface ThemePickerProps {
+interface ThemeSelectorProps {
   currentThemeId: string;
   currentVariantId?: string;
-  onSelect: (themeId: string, variantId?: string) => void;
+  onSelectTheme: (themeId: string, variantId?: string) => void;
 }
 
-export function ThemePicker({ currentThemeId, currentVariantId, onSelect }: ThemePickerProps) {
+export function ThemeSelector({ currentThemeId, currentVariantId, onSelectTheme }: ThemeSelectorProps) {
   const [selectedThemeId, setSelectedThemeId] = useState(currentThemeId);
   const variants = getThemeVariants(selectedThemeId);
   const currentTheme = themes.find(t => t.id === selectedThemeId);
@@ -27,7 +28,7 @@ export function ThemePicker({ currentThemeId, currentVariantId, onSelect }: Them
             <div
               className="w-32 h-32 rounded-lg"
               style={{
-                background: `linear-gradient(135deg, ${(currentVariant || currentTheme)?.colors.primary} 0%, ${(currentVariant || currentTheme)?.colors.secondary} 100%)`,
+                background: `linear-gradient(135deg, ${(currentVariant || currentTheme)?.tokens.colors.primary} 0%, ${(currentVariant || currentTheme)?.tokens.colors.secondary} 100%)`,
               }}
             />
             <div className="flex-1">
@@ -38,7 +39,7 @@ export function ThemePicker({ currentThemeId, currentVariantId, onSelect }: Them
                 {currentTheme?.category}
               </p>
               <div className="flex gap-2">
-                {Object.entries((currentVariant || currentTheme)?.colors || {}).slice(0, 6).map(([key, value]) => (
+                {Object.entries((currentVariant || currentTheme)?.tokens.colors || {}).slice(0, 6).map(([key, value]) => (
                   <div key={key} className="text-center">
                     <div
                       className="w-12 h-12 rounded-lg border-2 border-gray-200 mb-1"
@@ -61,7 +62,7 @@ export function ThemePicker({ currentThemeId, currentVariantId, onSelect }: Them
                 key={theme.id}
                 onClick={() => {
                   setSelectedThemeId(theme.id);
-                  onSelect(theme.id);
+                  onSelectTheme(theme.id);
                 }}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   currentThemeId === theme.id && !currentVariantId
@@ -72,7 +73,7 @@ export function ThemePicker({ currentThemeId, currentVariantId, onSelect }: Them
                 <div
                   className="h-20 rounded mb-3"
                   style={{
-                    background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.secondary} 100%)`,
+                    background: `linear-gradient(135deg, ${theme.tokens.colors.primary} 0%, ${theme.tokens.colors.secondary} 100%)`,
                   }}
                 />
                 <div className="text-sm font-medium text-gray-900">{theme.name}</div>
@@ -92,7 +93,7 @@ export function ThemePicker({ currentThemeId, currentVariantId, onSelect }: Them
               {variants.map(variant => (
                 <button
                   key={variant.id}
-                  onClick={() => onSelect(currentThemeId, variant.id)}
+                  onClick={() => onSelectTheme(currentThemeId, variant.id)}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     currentVariantId === variant.id
                       ? 'border-indigo-500 bg-indigo-50'
@@ -102,7 +103,7 @@ export function ThemePicker({ currentThemeId, currentVariantId, onSelect }: Them
                   <div
                     className="h-20 rounded mb-3"
                     style={{
-                      background: `linear-gradient(135deg, ${variant.colors.primary} 0%, ${variant.colors.secondary} 100%)`,
+                      background: `linear-gradient(135deg, ${variant.tokens.colors.primary} 0%, ${variant.tokens.colors.secondary} 100%)`,
                     }}
                   />
                   <div className="text-sm font-medium text-gray-900">{variant.name}</div>

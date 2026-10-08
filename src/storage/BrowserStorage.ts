@@ -1,4 +1,5 @@
-// Browser storage layer using localStorage
+// Storage abstraction layer - Phase 1 uses localStorage, future phases can use filesystem/database
+
 import type { Project, User, Session } from '../types';
 
 const PROJECTS_KEY = 'wf_projects';
@@ -34,7 +35,7 @@ export function deleteProject(id: string): void {
   saveProjects(getProjects().filter(p => p.id !== id));
 }
 
-// Users (simplified auth)
+// Users (simplified auth for Phase 1)
 export function getUsers(): User[] {
   const data = localStorage.getItem(USERS_KEY);
   if (!data) {

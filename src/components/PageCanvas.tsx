@@ -1,4 +1,4 @@
-// Page canvas with drag-and-drop, resize, and section management
+// Page canvas with drag-and-drop section builder
 import { useState } from 'react';
 import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -40,50 +40,6 @@ function DraggableComponent({ component }: { component: any }) {
   );
 }
 
-function DroppableSection({ section, index, theme, onRemove, onMove, onSelect, isSelected }: any) {
-  return (
-    <div className="relative group">
-      <SectionRenderer
-        section={section}
-        theme={theme}
-        isEditing={true}
-        isSelected={isSelected}
-        onClick={() => onSelect(section.id)}
-      />
-      
-      {/* Section controls */}
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={(e) => { e.stopPropagation(); onMove(index, -1); }}
-          disabled={index === 0}
-          className="p-1.5 bg-white rounded shadow hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Move up"
-        >
-          ↑
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onMove(index, 1); }}
-          disabled={index === section.length - 1}
-          className="p-1.5 bg-white rounded shadow hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Move down"
-        >
-          ↓
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemove(section.id); }}
-          className="p-1.5 bg-white rounded shadow hover:bg-red-50 text-red-600"
-          title="Remove section"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Resize handle */}
-      <div className="absolute bottom-0 left-0 right-0 h-2 bg-transparent hover:bg-indigo-500/20 cursor-ns-resize opacity-0 group-hover:opacity-100 transition-opacity" />
-    </div>
-  );
-}
-
 export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
@@ -100,9 +56,12 @@ export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
           const newSection: Section = {
             id: Date.now().toString(),
             type: componentType,
+            variant: componentDef.variants[0] || 'default',
             content: { ...componentDef.defaultContent },
-            animation: { type: 'none', duration: 0.5, delay: 0 },
-            style: {},
+            settings: {},
+            animation: { type: 'none', duration: 0, delay: 0 },
+            order: page.sections.length,
+            visible: true,
           };
           onUpdate({
             ...page,
@@ -129,6 +88,8 @@ export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
     
     const newSections = [...page.sections];
     [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
+    // Update order
+    newSections.forEach((s, i) => s.order = i);
     onUpdate({ ...page, sections: newSections });
   };
 
@@ -144,6 +105,8 @@ export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
   const { setNodeRef } = useDroppable({
     id: 'page-canvas',
   });
+
+  const selectedSection = page.sections.find(s => s.id === selectedSectionId);
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -163,10 +126,6 @@ export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
           <div
             ref={setNodeRef}
             className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg min-h-[600px]"
-            style={{
-              maxWidth: page.layout.maxWidth,
-              padding: page.layout.padding,
-            }}
           >
             {page.sections.length === 0 ? (
               <div className="flex items-center justify-center h-[600px] text-gray-400">
@@ -179,16 +138,44 @@ export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
             ) : (
               <div className="space-y-0">
                 {page.sections.map((section, index) => (
-                  <DroppableSection
+                  <div
                     key={section.id}
-                    section={section}
-                    index={index}
-                    theme={theme}
-                    onRemove={removeSection}
-                    onMove={moveSection}
-                    onSelect={setSelectedSectionId}
-                    isSelected={selectedSectionId === section.id}
-                  />
+                    className={`relative group ${selectedSectionId === section.id ? 'ring-2 ring-indigo-500' : ''}`}
+                    onClick={() => setSelectedSectionId(section.id)}
+                  >
+                    <SectionRenderer
+                      section={section}
+                      theme={theme}
+                      editMode={false}
+                    />
+                    
+                    {/* Section controls */}
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveSection(index, -1); }}
+                        disabled={index === 0}
+                        className="p-1.5 bg-white rounded shadow hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveSection(index, 1); }}
+                        disabled={index === page.sections.length - 1}
+                        className="p-1.5 bg-white rounded shadow hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}
+                        className="p-1.5 bg-white rounded shadow hover:bg-red-50 text-red-600"
+                        title="Remove section"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -196,12 +183,12 @@ export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
         </div>
 
         {/* Properties panel */}
-        {selectedSectionId && (
+        {selectedSection && (
           <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
             <SectionEditor
-              section={page.sections.find(s => s.id === selectedSectionId)!}
+              section={selectedSection}
               theme={theme}
-              onUpdate={(updates: Partial<Section>) => updateSection(selectedSectionId, updates)}
+              onUpdate={(updates) => updateSection(selectedSection.id, updates)}
               onClose={() => setSelectedSectionId(null)}
             />
           </div>
@@ -212,7 +199,12 @@ export function PageCanvas({ page, theme, onUpdate }: PageCanvasProps) {
 }
 
 // Section editor component
-function SectionEditor({ section, theme, onUpdate, onClose }: any) {
+function SectionEditor({ section, theme, onUpdate, onClose }: {
+  section: Section;
+  theme: Theme | ThemeVariant;
+  onUpdate: (updates: Partial<Section>) => void;
+  onClose: () => void;
+}) {
   const [activeTab, setActiveTab] = useState<'content' | 'animation' | 'style'>('content');
 
   return (
@@ -326,17 +318,16 @@ function SectionEditor({ section, theme, onUpdate, onClose }: any) {
               onChange={(e) => onUpdate({
                 animation: {
                   ...section.animation,
-                  type: e.target.value,
-                  duration: section.animation?.duration || 0.5,
+                  type: e.target.value as any,
+                  duration: section.animation?.duration || 500,
                   delay: section.animation?.delay || 0,
                 }
               })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             >
               <option value="none">None</option>
-              <option value="fadeIn">Fade In</option>
-              <option value="slideUp">Slide Up</option>
-              <option value="slideLeft">Slide Left</option>
+              <option value="fade">Fade</option>
+              <option value="slide">Slide</option>
               <option value="scale">Scale</option>
               <option value="bounce">Bounce</option>
             </select>
@@ -344,50 +335,44 @@ function SectionEditor({ section, theme, onUpdate, onClose }: any) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Duration (seconds)
+              Duration (ms)
             </label>
             <input
-              type="range"
-              min="0"
-              max="5"
-              step="0.1"
-              value={section.animation?.duration || 0.5}
+              type="number"
+              value={section.animation?.duration || 500}
               onChange={(e) => onUpdate({
                 animation: {
                   ...section.animation,
-                  duration: parseFloat(e.target.value),
+                  duration: parseInt(e.target.value),
                   delay: section.animation?.delay || 0,
                 }
               })}
-              className="w-full"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              min="0"
+              max="5000"
+              step="100"
             />
-            <div className="text-sm text-gray-600 mt-1">
-              {section.animation?.duration || 0.5}s
-            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Delay (seconds)
+              Delay (ms)
             </label>
             <input
-              type="range"
-              min="0"
-              max="5"
-              step="0.1"
+              type="number"
               value={section.animation?.delay || 0}
               onChange={(e) => onUpdate({
                 animation: {
                   ...section.animation,
-                  duration: section.animation?.duration || 0.5,
-                  delay: parseFloat(e.target.value),
+                  duration: section.animation?.duration || 500,
+                  delay: parseInt(e.target.value),
                 }
               })}
-              className="w-full"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              min="0"
+              max="5000"
+              step="100"
             />
-            <div className="text-sm text-gray-600 mt-1">
-              {section.animation?.delay || 0}s
-            </div>
           </div>
         </div>
       )}
@@ -401,9 +386,9 @@ function SectionEditor({ section, theme, onUpdate, onClose }: any) {
             </label>
             <input
               type="color"
-              value={section.style?.backgroundColor || theme.colors.background}
+              value={section.settings.backgroundColor || theme.tokens.colors.background}
               onChange={(e) => onUpdate({
-                style: { ...section.style, backgroundColor: e.target.value }
+                settings: { ...section.settings, backgroundColor: e.target.value }
               })}
               className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
             />
@@ -415,9 +400,9 @@ function SectionEditor({ section, theme, onUpdate, onClose }: any) {
             </label>
             <input
               type="text"
-              value={section.style?.padding || '4rem 2rem'}
+              value={section.settings.padding || '4rem 2rem'}
               onChange={(e) => onUpdate({
-                style: { ...section.style, padding: e.target.value }
+                settings: { ...section.settings, padding: e.target.value }
               })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="e.g., 4rem 2rem"
@@ -426,16 +411,16 @@ function SectionEditor({ section, theme, onUpdate, onClose }: any) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Border Radius
+              Margin
             </label>
             <input
               type="text"
-              value={section.style?.borderRadius || '0'}
+              value={section.settings.margin || '0'}
               onChange={(e) => onUpdate({
-                style: { ...section.style, borderRadius: e.target.value }
+                settings: { ...section.settings, margin: e.target.value }
               })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="e.g., 0.75rem"
+              placeholder="e.g., 2rem 0"
             />
           </div>
         </div>
