@@ -1,7 +1,7 @@
 // Dashboard - project list and management
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Project } from '../types';
+import type { Project, User } from '../types';
 import { getProjects, deleteProject, getCurrentUser, logout } from '../storage/BrowserStorage';
 import { industries } from '../data/industries';
 import { themes } from '../data/themes';
@@ -11,10 +11,11 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProject, setShowNewProject] = useState(false);
-  const user = getCurrentUser();
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     setProjects(getProjects());
+    getCurrentUser().then(setUser);
   }, []);
 
   const handleDelete = (id: string) => {

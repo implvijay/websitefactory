@@ -36,16 +36,25 @@ export function deleteProject(id: string): void {
 }
 
 // Users (simplified auth for Phase 1)
-export function getUsers(): User[] {
+export async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function getUsers(): Promise<User[]> {
   const data = localStorage.getItem(USERS_KEY);
   if (!data) {
-    // Create default admin user
+    // Create default admin user with SHA-256 hashed password
+    const passwordHash = await hashPassword('password');
     const defaultUser: User = {
       id: 'admin',
       email: 'admin@websitefactory.com',
       name: 'Admin User',
       role: 'administrator',
-      passwordHash: btoa('password'), // Simple hash for demo
+      passwordHash,
       createdAt: new Date().toISOString(),
     };
     saveUsers([defaultUser]);
@@ -58,12 +67,14 @@ export function saveUsers(users: User[]): void {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
-export function getUser(id: string): User | undefined {
-  return getUsers().find(u => u.id === id);
+export async function getUser(id: string): Promise<User | undefined> {
+  const users = await getUsers();
+  return users.find((u: User) => u.id === id);
 }
 
-export function getUserByEmail(email: string): User | undefined {
-  return getUsers().find(u => u.email === email);
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  const users = await getUsers();
+  return users.find((u: User) => u.email === email);
 }
 
 // Session
@@ -87,12 +98,13 @@ export function clearSession(): void {
 }
 
 // Auth helpers
-export function login(email: string, password: string): { success: boolean; user?: User; error?: string } {
-  const user = getUserByEmail(email);
+export async function login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  const user = await getUserByEmail(email);
   if (!user) {
     return { success: false, error: 'User not found' };
   }
-  if (user.passwordHash !== btoa(password)) {
+  const passwordHash = await hashPassword(password);
+  if (user.passwordHash !== passwordHash) {
     return { success: false, error: 'Invalid password' };
   }
   const session: Session = {
@@ -108,10 +120,11 @@ export function logout(): void {
   clearSession();
 }
 
-export function getCurrentUser(): User | null {
+export async function getCurrentUser(): Promise<User | null> {
   const session = getSession();
   if (!session) return null;
-  return getUser(session.userId) || null;
+  const user = await getUser(session.userId);
+  return user || null;
 }
 
 // Permissions

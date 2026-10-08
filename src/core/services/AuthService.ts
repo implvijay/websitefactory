@@ -12,7 +12,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
-    const user = getUserByEmail(email);
+    const user = await getUserByEmail(email);
     if (!user) {
       return { success: false, error: 'User not found' };
     }
@@ -39,7 +39,8 @@ export class AuthService {
   async getCurrentUser(): Promise<User | null> {
     const session = getSession();
     if (!session) return null;
-    return getUser(session.userId) || null;
+    const user = await getUser(session.userId);
+    return user || null;
   }
 
   async initialize(): Promise<{ user: User | null; isAuthenticated: boolean }> {
